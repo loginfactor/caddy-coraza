@@ -1,0 +1,144 @@
+name: Build and Push
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - versions.json
+      - Dockerfile
+      - Caddyfile
+      - .github/workflows/build.yml
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      caddy: ${{ steps.versions.outputs.caddy }}
+      coraza: ${{ steps.versions.outputs.coraza }}
+      go: ${{ steps.versions.outputs.go }}
+      crs_matrix: ${{ steps.versions.outputs.crs_matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read versions
+        id: versions
+        run: |
+          echo "caddy=$(jq -r .caddy versions.json)" >> "$GITHUB_OUTPUT"
+          echo "coraza=$(jq -r .coraza_caddy versions.json)" >> "$GITHUB_OUTPUT"
+          echo "go=$(jq -r .go versions.json)" >> "$GITHUB_OUTPUT"
+          # Build matrix from crs_versions map: [{"minor":"4.25","patch":"4.25.0"}, ...]
+          echo "crs_matrix=$(jq -c '[.crs_versions | to_entries[] | {minor: .key, patch: .value}]' versions.json)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        crs: ${{ fromJson(needs.prepare.outputs.crs_matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set image metadata
+        id: meta
+        run: |
+          CADDY="${{ needs.prepare.outputs.caddy }}"
+          CORAZA="${{ needs.prepare.outputs.coraza }}"
+          CRS_MINOR="${{ matrix.crs.minor }}"
+          CRS_PATCH="${{ matrix.crs.patch }}"
+          CADDY_MAJOR="${CADDY%%.*}"
+          CORAZA_MAJOR="${CORAZA%%.*}"
+          CRS_MAJOR="${CRS_MINOR%%.*}"
+          IMAGE="ghcr.io/${{ github.repository }}"
+
+          TAGS="${IMAGE}:${CADDY}-${CORAZA}-${CRS_PATCH}"
+          TAGS="${TAGS},${IMAGE}:${CADDY_MAJOR}-${CORAZA_MAJOR}-${CRS_MINOR}"
+          TAGS="${TAGS},${IMAGE}:${CADDY_MAJOR}-${CORAZA_MAJOR}-${CRS_MAJOR}"
+          TAGS="${TAGS},${IMAGE}:latest"
+
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+          echo "caddy=${CADDY}" >> "$GITHUB_OUTPUT"
+          echo "coraza=${CORAZA}" >> "$GITHUB_OUTPUT"
+          echo "crs_patch=${CRS_PATCH}" >> "$GITHUB_OUTPUT"
+
+      # Build for testing (single platform, load into local docker)
+      - name: Build test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: caddy-coraza:test
+          build-args: |
+            GO_VERSION=${{ needs.prepare.outputs.go }}
+            CADDY_VERSION=${{ steps.meta.outputs.caddy }}
+            CORAZA_CADDY_VERSION=${{ steps.meta.outputs.coraza }}
+            CRS_VERSION=${{ steps.meta.outputs.crs_patch }}
+
+      - name: Test image
+        run: |
+          # Start container with test Caddyfile
+          docker run --rm -d --name caddy-test \
+            -p 8080:80 \
+            -v "${{ github.workspace }}/test/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy-coraza:test
+
+          # Wait for Caddy to start
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080 > /dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+
+          # Health check
+          echo "=== Health Check ==="
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080)
+          if [ "$STATUS" != "200" ]; then
+            echo "FAIL: Expected 200, got $STATUS"
+            docker logs caddy-test
+            exit 1
+          fi
+          echo "OK: Got 200"
+
+          # WAF test - XSS should be blocked
+          echo "=== WAF Test (XSS) ==="
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' 'http://localhost:8080?q=<script>alert(1)</script>')
+          if [ "$STATUS" != "403" ]; then
+            echo "FAIL: Expected 403, got $STATUS"
+            docker logs caddy-test
+            exit 1
+          fi
+          echo "OK: XSS blocked with 403"
+
+          docker stop caddy-test
+
+      # Build and push multi-platform
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            GO_VERSION=${{ needs.prepare.outputs.go }}
+            CADDY_VERSION=${{ steps.meta.outputs.caddy }}
+            CORAZA_CADDY_VERSION=${{ steps.meta.outputs.coraza }}
+            CRS_VERSION=${{ steps.meta.outputs.crs_patch }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
