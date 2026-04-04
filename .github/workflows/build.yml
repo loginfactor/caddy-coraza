@@ -91,6 +91,8 @@ jobs:
             CADDY_VERSION=${{ steps.meta.outputs.caddy }}
             CORAZA_CADDY_VERSION=${{ steps.meta.outputs.coraza }}
             CRS_VERSION=${{ steps.meta.outputs.crs_patch }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Test image
         run: |

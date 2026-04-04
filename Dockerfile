@@ -1,8 +1,10 @@
 ARG GO_VERSION=1.25
 
-# Stage 1: Build Caddy with Coraza WAF plugin
-FROM golang:${GO_VERSION}-alpine AS builder
+# Stage 1: Build Caddy with Coraza WAF plugin (native cross-compilation)
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine AS builder
 
+ARG TARGETARCH
+ARG TARGETOS
 ARG CADDY_VERSION
 ARG CORAZA_CADDY_VERSION
 ARG CRS_VERSION
@@ -10,6 +12,9 @@ ARG XCADDY_VERSION
 
 RUN apk add --no-cache git && \
     go install github.com/caddyserver/xcaddy/cmd/xcaddy@v${XCADDY_VERSION}
+
+ENV GOOS=${TARGETOS} \
+    GOARCH=${TARGETARCH}
 
 RUN xcaddy build v${CADDY_VERSION} \
     --with github.com/corazawaf/coraza-caddy/v2@v${CORAZA_CADDY_VERSION}
