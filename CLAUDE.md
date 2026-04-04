@@ -3,7 +3,7 @@
 ## Goal
 
 Docker image for Caddy as a **reverse proxy with Web Application Firewall (WAF)**.
-Caddy is built with the Coraza WAF plugin and embedded OWASP Core Rule Set (CRS).
+Caddy is built with the Coraza WAF plugin. OWASP Core Rule Set (CRS) is downloaded separately and loaded from the filesystem, so users can mount their own `crs-setup.conf` or exclusion files.
 Images are automatically built for new upstream versions and pushed to GitHub Container Registry (ghcr.io).
 
 ## Architecture decisions
@@ -20,13 +20,12 @@ Single source of truth for all versions. Read by Dockerfile and GitHub Actions.
 
 CRS releases much more frequently than Caddy/Coraza. New CRS branches should be added deliberately, while patch updates within a branch are safe to automate.
 
-### CRS versions: Go module vs. OWASP CRS
+### CRS: filesystem-based
 
-The CRS versions in `versions.json` refer to the **Go module** `github.com/corazawaf/coraza-coreruleset`, NOT the official OWASP CRS releases. The Go module often lags behind. Always verify that a version exists as a Go module before changing it:
+CRS rules are downloaded from the official `coreruleset/coreruleset` repo and installed to `/etc/caddy/crs/` in the image. This allows users to mount custom configuration:
 
-```bash
-curl -sf "https://api.github.com/repos/corazawaf/coraza-coreruleset/releases" | jq -r '.[].tag_name'
-```
+- `/etc/caddy/crs/crs-setup.conf` -- override with custom paranoia level, anomaly thresholds, etc.
+- Additional exclusion files can be included via the Caddyfile `directives` block
 
 ### Docker image
 

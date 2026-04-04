@@ -135,7 +135,7 @@ echo "=== Checking CRS patch versions ==="
 for MINOR in $(jq -r '.crs_versions | keys[]' "$VERSIONS_FILE"); do
   CURRENT_PATCH=$(jq -r --arg m "$MINOR" '.crs_versions[$m]' "$VERSIONS_FILE")
 
-  if LATEST_PATCH=$(github_latest_patch "corazawaf/coraza-coreruleset" "$MINOR"); then
+  if LATEST_PATCH=$(github_latest_patch "coreruleset/coreruleset" "$MINOR"); then
     if [ "$CURRENT_PATCH" = "$LATEST_PATCH" ]; then
       echo "OK: CRS ${MINOR} ${CURRENT_PATCH} (up to date)"
     else

@@ -39,11 +39,10 @@ Example Caddyfile:
 
 example.com {
     coraza_waf {
-        load_owasp_crs
         directives `
-            Include @coraza.conf-recommended
-            Include @crs-setup.conf.example
-            Include @owasp_crs/*.conf
+            Include /etc/caddy/coraza.conf
+            Include /etc/caddy/crs/crs-setup.conf
+            Include /etc/caddy/crs/rules/*.conf
             SecRuleEngine On
         `
     }
@@ -55,7 +54,7 @@ example.com {
 
 All versions are defined in `versions.json`. Caddy and Coraza are updated automatically. CRS minor branches are added manually, patch versions within a branch are updated automatically.
 
-CRS versions refer to the Go module `github.com/corazawaf/coraza-coreruleset`, which may lag behind official OWASP CRS releases.
+CRS rules are installed to `/etc/caddy/crs/`. Mount a custom `crs-setup.conf` to adjust paranoia level, anomaly thresholds, or add exclusion rules.
 
 ## Building locally
 
