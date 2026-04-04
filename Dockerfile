@@ -17,7 +17,8 @@ RUN xcaddy build v${CADDY_VERSION} \
 # Stage 2: Runtime
 FROM registry.access.redhat.com/ubi9/ubi-minimal
 
-RUN microdnf install -y ca-certificates libcap mailcap && \
+RUN microdnf update -y && \
+    microdnf install -y ca-certificates libcap mailcap && \
     microdnf clean all
 
 COPY --from=builder /go/caddy /usr/bin/caddy
