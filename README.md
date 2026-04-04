@@ -21,7 +21,7 @@ docker pull ghcr.io/<owner>/caddy-coraza:2-2-4.25
 
 ## Usage
 
-The default Caddyfile sets up Coraza WAF with OWASP CRS in front of a reverse proxy. Mount your own Caddyfile to configure the upstream:
+The image ships Caddy with Coraza and CRS rules but no Caddyfile. Mount your own:
 
 ```bash
 docker run -d -p 80:80 -p 443:443 \
@@ -35,12 +35,23 @@ Example Caddyfile:
 ```caddyfile
 {
     order coraza_waf first
+    admin off
 }
 
 example.com {
     coraza_waf {
         directives `
-            Include /etc/caddy/coraza.conf
+            SecRequestBodyAccess On
+            SecRequestBodyLimit 13107200
+            SecRequestBodyNoFilesLimit 131072
+            SecResponseBodyAccess On
+            SecResponseBodyMimeType text/plain text/html text/xml
+            SecResponseBodyLimit 1048576
+            SecResponseBodyLimitAction ProcessPartial
+            SecArgumentSeparator &
+            SecCookieFormat 0
+            SecAuditEngine Off
+            SecAuditLog /dev/stderr
             Include /etc/caddy/crs/crs-setup.conf
             Include /etc/caddy/crs/rules/*.conf
             SecRuleEngine On

@@ -6,7 +6,6 @@ on:
     paths:
       - versions.json
       - Dockerfile
-      - Caddyfile
       - .github/workflows/build.yml
   workflow_dispatch:
   workflow_call:

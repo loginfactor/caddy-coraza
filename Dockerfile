@@ -43,9 +43,6 @@ RUN mkdir -p /config/caddy /data/caddy /etc/caddy /tmp/caddy && \
     chown -R caddy:caddy /config /data /tmp/caddy && \
     setcap cap_net_bind_service=+ep /usr/bin/caddy
 
-COPY --chmod=444 coraza.conf /etc/caddy/coraza.conf
-COPY --chmod=444 Caddyfile /etc/caddy/Caddyfile
-
 ENV XDG_CONFIG_HOME=/config
 ENV XDG_DATA_HOME=/data
 ENV TMPDIR=/tmp/caddy

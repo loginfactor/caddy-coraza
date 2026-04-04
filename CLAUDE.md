@@ -38,8 +38,8 @@ CRS rules are downloaded from the official `coreruleset/coreruleset` repo and in
 The image is hardened at build time:
 
 - Non-root user `caddy` (1000:1000), no login shell
-- Caddy binary read-only (555), config files read-only (444)
-- Admin API disabled (`admin off` in Caddyfile)
+- Caddy binary read-only (555)
+- No Caddyfile or coraza.conf in image (user must mount their own)
 - Built-in `HEALTHCHECK`
 
 For full hardening, apply these runtime flags:
@@ -74,7 +74,6 @@ docker run --read-only --cap-drop ALL --cap-add NET_BIND_SERVICE \
 ```
 versions.json                         # Central version constants
 Dockerfile                            # Multi-stage build (xcaddy, UBI9)
-Caddyfile                             # Default config (reverse_proxy + WAF)
 test/Caddyfile                        # Test config (respond "OK" 200)
 .github/workflows/build.yml           # Build, test & push
 .github/workflows/check-updates.yml   # Automatic version check
