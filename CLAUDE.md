@@ -1,92 +1,95 @@
 # Caddy + Coraza WAF + OWASP CRS
 
-## Projektziel
+## Goal
 
-Docker-Image für Caddy als **Reverse Proxy mit Web Application Firewall (WAF)**.
-Caddy wird mit dem Coraza WAF Plugin und eingebettetem OWASP Core Rule Set (CRS) gebaut.
-Images werden automatisch für neue Upstream-Versionen gebaut und auf GitHub Container Registry (ghcr.io) gepusht.
+Docker image for Caddy as a **reverse proxy with Web Application Firewall (WAF)**.
+Caddy is built with the Coraza WAF plugin and embedded OWASP Core Rule Set (CRS).
+Images are automatically built for new upstream versions and pushed to GitHub Container Registry (ghcr.io).
 
-## Architekturentscheidungen
+## Architecture decisions
 
-### Versionsverwaltung (`versions.json`)
+### Version management (`versions.json`)
 
-Zentrale Datei für alle Versionen. Wird von Dockerfile und GitHub Actions gelesen.
+Single source of truth for all versions. Read by Dockerfile and GitHub Actions.
 
-- **Caddy + Coraza**: Werden automatisch via `scripts/check-versions.sh` aktualisiert (täglich per Cron)
-- **CRS**: `crs_versions` ist eine Map (`"minor": "patch"`), z.B. `{"4.24": "4.24.1"}`
-  - **Keys** (Minor/LTS-Branches) werden manuell gepflegt
-  - **Values** (Patch-Versionen) werden automatisch aktualisiert
-  - Pro Key wird ein separates Image gebaut (Matrix-Build)
+- **Caddy + Coraza**: Automatically updated via `scripts/check-versions.sh` (daily cron)
+- **CRS**: `crs_versions` is a map (`"minor": "patch"`), e.g. `{"4.25": "4.25.0"}`
+  - **Keys** (minor/LTS branches) are managed manually
+  - **Values** (patch versions) are updated automatically
+  - Each key produces a separate image (matrix build)
 
-Hintergrund: CRS wird deutlich häufiger released als Caddy/Coraza. Neue CRS-Branches sollen bewusst hinzugefügt werden, Patch-Updates innerhalb eines Branches sind aber automatisch sicher.
+CRS releases much more frequently than Caddy/Coraza. New CRS branches should be added deliberately, while patch updates within a branch are safe to automate.
 
-### CRS-Versionen: Go-Modul vs. OWASP CRS
+### CRS versions: Go module vs. OWASP CRS
 
-Die CRS-Versionen in `versions.json` beziehen sich auf das **Go-Modul** `github.com/corazawaf/coraza-coreruleset`, NICHT auf die offiziellen OWASP CRS Releases. Das Go-Modul hinkt dem offiziellen Release oft hinterher. Vor Versionsänderungen immer prüfen ob die Version als Go-Modul existiert:
+The CRS versions in `versions.json` refer to the **Go module** `github.com/corazawaf/coraza-coreruleset`, NOT the official OWASP CRS releases. The Go module often lags behind. Always verify that a version exists as a Go module before changing it:
 
 ```bash
 curl -sf "https://api.github.com/repos/corazawaf/coraza-coreruleset/releases" | jq -r '.[].tag_name'
 ```
 
-### Docker Image
+### Docker image
 
-- **Builder**: `golang:<version>-alpine` mit xcaddy
-- **Runtime**: `registry.access.redhat.com/ubi9/ubi-minimal` (Support bis 2032)
-- **Einsatzzweck**: Nur Reverse Proxy mit WAF — keine statischen Dateien
+- **Builder**: `golang:<version>-alpine` with xcaddy
+- **Runtime**: `registry.access.redhat.com/ubi9/ubi-minimal` (supported until 2032)
+- **Purpose**: Reverse proxy with WAF only, no static file serving
 
-### Image-Tags (hierarchisch)
+### Image tags (hierarchical)
 
-| Tag | Beispiel | Beschreibung |
+| Tag | Example | Description |
 |---|---|---|
-| Exakt (immutable) | `2.11.2-2.3.0-4.24.1` | Pinned, ändert sich nie |
-| CRS-Minor pinned | `2-2-4.24` | Rolling für Caddy/Coraza, CRS-Patch |
-| CRS-Major pinned | `2-2-4` | Rolling für alles außer Major-Bumps |
-| `latest` | `latest` | Neuester Build |
+| Exact (immutable) | `2.11.2-2.3.0-4.25.0` | Pinned, never changes |
+| CRS minor pinned | `2-2-4.25` | Rolling for Caddy/Coraza, CRS patch |
+| CRS major pinned | `2-2-4` | Rolling for everything except major bumps |
+| `latest` | `latest` | Most recent build |
 
 ### CI/CD
 
-- **`build.yml`**: Baut bei Push auf `main`, testet (Health-Check + WAF-Test), pusht zu GHCR
-- **`check-updates.yml`**: Täglicher Cron (06:00 UTC), prüft neue Versionen, committed und pusht automatisch → triggert Build
+- **`build.yml`**: Builds on push to `main`, tests (health check + WAF test), pushes to GHCR
+- **`check-updates.yml`**: Daily cron (06:00 UTC), checks for new versions, commits and pushes automatically, which triggers the build
 
-## Dateistruktur
+## File structure
 
 ```
-versions.json                         # Zentrale Versionskonstanten
-Dockerfile                            # Multi-Stage Build (xcaddy → UBI9)
-Caddyfile                             # Default-Konfiguration (reverse_proxy + WAF)
-test/Caddyfile                        # Test-Konfiguration (respond "OK" 200)
-.github/workflows/build.yml           # Build, Test & Push
-.github/workflows/check-updates.yml   # Automatischer Version-Check
-scripts/check-versions.sh             # Upstream-Version-Erkennung
+versions.json                         # Central version constants
+Dockerfile                            # Multi-stage build (xcaddy, UBI9)
+Caddyfile                             # Default config (reverse_proxy + WAF)
+test/Caddyfile                        # Test config (respond "OK" 200)
+.github/workflows/build.yml           # Build, test & push
+.github/workflows/check-updates.yml   # Automatic version check
+scripts/check-versions.sh             # Upstream version detection
 ```
 
-## Git-Konventionen
+## Style
 
-- Commit-Messages sind **Einzeiler** (kein Body, kein Multi-Line)
-- **Kein** `Co-Authored-By: Claude` oder ähnliche Zuschreibungen
+- Write in a minimalist, natural style
+- No emojis, no em dashes, no AI-typical phrasing
+- All text output in English
+- Commit messages are one-liners (no body, no multi-line)
+- No `Co-Authored-By: Claude` or similar attributions
 
-## Lokaler Build
+## Local build
 
 ```bash
 docker build \
   --build-arg GO_VERSION=1.25 \
   --build-arg CADDY_VERSION=2.11.2 \
   --build-arg CORAZA_CADDY_VERSION=2.3.0 \
-  --build-arg CRS_VERSION=4.24.1 \
+  --build-arg CRS_VERSION=4.25.0 \
   -t caddy-coraza:test .
 ```
 
-## Testen
+## Testing
 
 ```bash
-# Container mit Test-Caddyfile starten
+# Start container with test Caddyfile
 docker run --rm -d --name caddy-test -p 8080:80 \
   -v $(pwd)/test/Caddyfile:/etc/caddy/Caddyfile:ro caddy-coraza:test
 
-# Health-Check (erwartet 200)
+# Health check (expect 200)
 curl -s -o /dev/null -w '%{http_code}' http://localhost:8080
 
-# WAF-Test: XSS (erwartet 403)
+# WAF test: XSS (expect 403)
 curl -s -o /dev/null -w '%{http_code}' 'http://localhost:8080?q=<script>alert(1)</script>'
 
 docker stop caddy-test
