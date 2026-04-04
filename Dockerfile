@@ -46,6 +46,7 @@ RUN mkdir -p /config/caddy /data/caddy /etc/caddy /tmp/caddy && \
 ENV XDG_CONFIG_HOME=/config
 ENV XDG_DATA_HOME=/data
 ENV TMPDIR=/tmp/caddy
+ENV CADDY_ADMIN=off
 
 EXPOSE 80 443 443/udp
 
