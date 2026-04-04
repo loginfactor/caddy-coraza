@@ -28,18 +28,28 @@ RUN microdnf update -y && \
     microdnf install -y ca-certificates libcap mailcap && \
     microdnf clean all
 
-COPY --from=builder /go/caddy /usr/bin/caddy
+RUN groupadd --gid 1000 caddy && \
+    useradd --uid 1000 --gid caddy --home-dir /data --no-create-home --shell /sbin/nologin caddy
+
+COPY --from=builder --chmod=555 /go/caddy /usr/bin/caddy
 COPY --from=builder /tmp/crs /etc/caddy/crs
 
-RUN mkdir -p /config/caddy /data/caddy /etc/caddy /usr/share/caddy && \
+RUN mkdir -p /config/caddy /data/caddy /etc/caddy /tmp/caddy && \
+    chown -R caddy:caddy /config /data /tmp/caddy && \
     setcap cap_net_bind_service=+ep /usr/bin/caddy
 
-COPY coraza.conf /etc/caddy/coraza.conf
-COPY Caddyfile /etc/caddy/Caddyfile
+COPY --chmod=444 coraza.conf /etc/caddy/coraza.conf
+COPY --chmod=444 Caddyfile /etc/caddy/Caddyfile
 
 ENV XDG_CONFIG_HOME=/config
 ENV XDG_DATA_HOME=/data
+ENV TMPDIR=/tmp/caddy
 
-EXPOSE 80 443 443/udp 2019
+EXPOSE 80 443 443/udp
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD ["caddy", "version"]
+
+USER caddy
 
 CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]

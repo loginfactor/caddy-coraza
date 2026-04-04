@@ -1,5 +1,6 @@
 {
     order coraza_waf first
+    admin off
 }
 
 :80 {

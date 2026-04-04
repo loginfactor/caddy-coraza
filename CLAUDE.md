@@ -33,6 +33,28 @@ CRS rules are downloaded from the official `coreruleset/coreruleset` repo and in
 - **Runtime**: `registry.access.redhat.com/ubi9/ubi-minimal` (supported until 2032)
 - **Purpose**: Reverse proxy with WAF only, no static file serving
 
+### Container hardening
+
+The image is hardened at build time:
+
+- Non-root user `caddy` (1000:1000), no login shell
+- Caddy binary read-only (555), config files read-only (444)
+- Admin API disabled (`admin off` in Caddyfile)
+- Built-in `HEALTHCHECK`
+
+For full hardening, apply these runtime flags:
+
+```bash
+docker run --read-only --cap-drop ALL --cap-add NET_BIND_SERVICE \
+  --security-opt no-new-privileges:true \
+  --tmpfs /tmp/caddy caddy-coraza:test
+```
+
+- `--read-only`: prevents writes to the container filesystem
+- `--cap-drop ALL --cap-add NET_BIND_SERVICE`: drops all capabilities except binding to ports < 1024
+- `--security-opt no-new-privileges:true`: prevents privilege escalation via setuid/setgid binaries
+- `--tmpfs /tmp/caddy`: writable tmpfs for runtime temp files
+
 ### Image tags (hierarchical)
 
 | Tag | Example | Description |

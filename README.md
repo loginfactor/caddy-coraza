@@ -50,6 +50,29 @@ example.com {
 }
 ```
 
+## Hardening
+
+The image runs as non-root user `caddy` (1000:1000) with read-only binaries and config. The Caddy admin API is disabled.
+
+For full hardening, add these runtime flags:
+
+```bash
+docker run --read-only --cap-drop ALL --cap-add NET_BIND_SERVICE \
+  --security-opt no-new-privileges:true \
+  --tmpfs /tmp/caddy \
+  -p 80:80 -p 443:443 \
+  -v /path/to/Caddyfile:/etc/caddy/Caddyfile:ro \
+  -v caddy_data:/data \
+  ghcr.io/<owner>/caddy-coraza:latest
+```
+
+| Flag | Effect |
+|---|---|
+| `--read-only` | Prevents writes to the container filesystem |
+| `--cap-drop ALL --cap-add NET_BIND_SERVICE` | Drops all capabilities except binding to ports < 1024 |
+| `--security-opt no-new-privileges:true` | Prevents privilege escalation |
+| `--tmpfs /tmp/caddy` | Writable tmpfs for runtime temp files |
+
 ## Versions
 
 All versions are defined in `versions.json`. Caddy and Coraza are updated automatically. CRS minor branches are added manually, patch versions within a branch are updated automatically.
