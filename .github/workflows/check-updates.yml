@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "0 6 * * *" # Daily at 06:00 UTC
   workflow_dispatch:
+    inputs:
+      min_age_days:
+        description: "Minimum release age in days (0 to skip age check)"
+        required: false
+        default: "7"
 
 permissions:
   contents: write
@@ -12,14 +17,15 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Check for new versions
         id: check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          OUTPUT=$(bash scripts/check-versions.sh versions.json 2>&1) || true
+          MIN_AGE="${{ inputs.min_age_days || '7' }}"
+          OUTPUT=$(bash scripts/check-versions.sh versions.json "$MIN_AGE" 2>&1) || true
           echo "$OUTPUT"
           if echo "$OUTPUT" | grep -q "updated=true"; then
             echo "has_updates=true" >> "$GITHUB_OUTPUT"

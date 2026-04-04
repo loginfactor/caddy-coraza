@@ -6,9 +6,10 @@ FROM golang:${GO_VERSION}-alpine AS builder
 ARG CADDY_VERSION
 ARG CORAZA_CADDY_VERSION
 ARG CRS_VERSION
+ARG XCADDY_VERSION
 
 RUN apk add --no-cache git && \
-    go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
+    go install github.com/caddyserver/xcaddy/cmd/xcaddy@v${XCADDY_VERSION}
 
 RUN xcaddy build v${CADDY_VERSION} \
     --with github.com/corazawaf/coraza-caddy/v2@v${CORAZA_CADDY_VERSION} \

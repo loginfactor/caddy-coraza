@@ -73,6 +73,7 @@ scripts/check-versions.sh             # Upstream version detection
 ```bash
 docker build \
   --build-arg GO_VERSION=1.25 \
+  --build-arg XCADDY_VERSION=0.4.5 \
   --build-arg CADDY_VERSION=2.11.2 \
   --build-arg CORAZA_CADDY_VERSION=2.3.0 \
   --build-arg CRS_VERSION=4.25.0 \
