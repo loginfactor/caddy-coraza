@@ -3,7 +3,7 @@
 ## Goal
 
 Docker image for Caddy as a **reverse proxy with Web Application Firewall (WAF)**.
-Caddy is built with the Coraza WAF plugin. OWASP Core Rule Set (CRS) is downloaded separately and loaded from the filesystem, so users can mount their own `crs-setup.conf` or exclusion files.
+Caddy is built with the Coraza WAF plugin and the `caddy-ratelimit` plugin. OWASP Core Rule Set (CRS) is downloaded separately and loaded from the filesystem, so users can mount their own `crs-setup.conf` or exclusion files.
 Images are automatically built for new upstream versions and pushed to GitHub Container Registry (ghcr.io).
 
 ## Architecture decisions
@@ -17,6 +17,7 @@ Single source of truth for all versions. Read by Dockerfile and GitHub Actions.
   - **Keys** (minor/LTS branches) are managed manually
   - **Values** (patch versions) are updated automatically
   - Each key produces a separate image (matrix build)
+- **caddy-ratelimit**: hybrid pinning. Upstream has only one release tag (`v0.1.0`, Aug 2024) that predates fixes we depend on, so the field holds a manually chosen master commit SHA (12 chars). The cron only auto-updates this entry once a release strictly newer than `v0.1.0` ships; from then on it tracks releases like every other module. SHA bumps for security fixes between releases require a manual edit. The Dockerfile passes the value to xcaddy without a `v` prefix so the same field can hold either form.
 
 CRS releases much more frequently than Caddy/Coraza. New CRS branches should be added deliberately, while patch updates within a branch are safe to automate.
 
@@ -59,7 +60,7 @@ docker run --read-only --cap-drop ALL --cap-add NET_BIND_SERVICE \
 
 | Tag | Example | Description |
 |---|---|---|
-| Exact (immutable) | `2.11.2-2.3.0-4.25.0` | Pinned, never changes |
+| Exact (immutable) | `2.11.2-2.3.0-4.25.0-b8d8c9a` | Caddy / Coraza / CRS / ratelimit. Pinned, never changes. Ratelimit slot is a 7-char SHA when commit-pinned, full release tag otherwise. |
 | CRS minor pinned | `2-2-4.25` | Rolling for Caddy/Coraza, CRS patch |
 | CRS major pinned | `2-2-4` | Rolling for everything except major bumps |
 | `latest` | `latest` | Most recent build |
@@ -96,6 +97,7 @@ docker build \
   --build-arg XCADDY_VERSION=0.4.5 \
   --build-arg CADDY_VERSION=2.11.2 \
   --build-arg CORAZA_CADDY_VERSION=2.3.0 \
+  --build-arg CADDY_RATELIMIT_VERSION=b8d8c9a9d99e \
   --build-arg CRS_VERSION=4.25.0 \
   -t caddy-coraza:test .
 ```

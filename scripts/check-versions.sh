@@ -121,6 +121,35 @@ else
   echo "SKIP: Coraza-Caddy (no release older than ${MIN_AGE_DAYS} days)"
 fi
 
+# Check caddy-ratelimit (hybrid: SHA-pinned until a release > v0.1.0 appears)
+# v0.1.0 is the only existing release and predates fixes we depend on, so the
+# pin is a manually chosen master commit. The script auto-switches back to
+# release tracking the moment a newer release ships upstream.
+CURRENT_RATELIMIT=$(jq -r .caddy_ratelimit "$VERSIONS_FILE")
+RATELIMIT_FLOOR="0.1.0"
+if [[ "$CURRENT_RATELIMIT" == *.* ]]; then
+  # Already tag-pinned: standard release tracking
+  if LATEST_RATELIMIT=$(github_latest_release "mholt/caddy-ratelimit"); then
+    update_version "caddy_ratelimit" "$CURRENT_RATELIMIT" "$LATEST_RATELIMIT" "caddy-ratelimit"
+  else
+    echo "SKIP: caddy-ratelimit (no release older than ${MIN_AGE_DAYS} days)"
+  fi
+else
+  # SHA-pinned: only switch if a release strictly newer than the floor exists
+  if LATEST_RATELIMIT=$(github_latest_release "mholt/caddy-ratelimit"); then
+    NEWER=$(printf '%s\n%s' "$RATELIMIT_FLOOR" "$LATEST_RATELIMIT" | sort -V | tail -1)
+    if [ "$NEWER" = "$LATEST_RATELIMIT" ] && [ "$LATEST_RATELIMIT" != "$RATELIMIT_FLOOR" ]; then
+      echo "UPDATE: caddy-ratelimit ${CURRENT_RATELIMIT} (commit) → ${LATEST_RATELIMIT} (release)"
+      jq --arg v "$LATEST_RATELIMIT" '.caddy_ratelimit = $v' "$VERSIONS_FILE" > tmp.json && mv tmp.json "$VERSIONS_FILE"
+      UPDATED=true
+    else
+      echo "OK: caddy-ratelimit ${CURRENT_RATELIMIT} (commit-pinned, no release > v${RATELIMIT_FLOOR})"
+    fi
+  else
+    echo "OK: caddy-ratelimit ${CURRENT_RATELIMIT} (commit-pinned, no qualifying release)"
+  fi
+fi
+
 # Check xcaddy
 CURRENT_XCADDY=$(jq -r .xcaddy "$VERSIONS_FILE")
 if LATEST_XCADDY=$(github_latest_release "caddyserver/xcaddy"); then

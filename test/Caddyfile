@@ -1,5 +1,6 @@
 {
     order coraza_waf first
+    order rate_limit after coraza_waf
     admin off
 }
 
@@ -22,5 +23,17 @@
             SecRuleEngine On
         `
     }
+
+    rate_limit {
+        zone test_limited {
+            match {
+                path /limited*
+            }
+            key {remote_host}
+            events 2
+            window 1m
+        }
+    }
+
     respond "OK" 200
 }

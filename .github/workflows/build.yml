@@ -20,6 +20,7 @@ jobs:
     outputs:
       caddy: ${{ steps.versions.outputs.caddy }}
       coraza: ${{ steps.versions.outputs.coraza }}
+      ratelimit: ${{ steps.versions.outputs.ratelimit }}
       go: ${{ steps.versions.outputs.go }}
       xcaddy: ${{ steps.versions.outputs.xcaddy }}
       crs_matrix: ${{ steps.versions.outputs.crs_matrix }}
@@ -31,6 +32,7 @@ jobs:
         run: |
           echo "caddy=$(jq -r .caddy versions.json)" >> "$GITHUB_OUTPUT"
           echo "coraza=$(jq -r .coraza_caddy versions.json)" >> "$GITHUB_OUTPUT"
+          echo "ratelimit=$(jq -r .caddy_ratelimit versions.json)" >> "$GITHUB_OUTPUT"
           echo "go=$(jq -r .go versions.json)" >> "$GITHUB_OUTPUT"
           echo "xcaddy=$(jq -r .xcaddy versions.json)" >> "$GITHUB_OUTPUT"
           # Build matrix from crs_versions map: [{"minor":"4.25","patch":"4.25.0"}, ...]
@@ -60,6 +62,7 @@ jobs:
         run: |
           CADDY="${{ needs.prepare.outputs.caddy }}"
           CORAZA="${{ needs.prepare.outputs.coraza }}"
+          RATELIMIT="${{ needs.prepare.outputs.ratelimit }}"
           CRS_MINOR="${{ matrix.crs.minor }}"
           CRS_PATCH="${{ matrix.crs.patch }}"
           CADDY_MAJOR="${CADDY%%.*}"
@@ -67,7 +70,15 @@ jobs:
           CRS_MAJOR="${CRS_MINOR%%.*}"
           IMAGE="ghcr.io/${{ github.repository }}"
 
-          TAGS="${IMAGE}:${CADDY}-${CORAZA}-${CRS_PATCH}"
+          # Ratelimit ref for the immutable tag: full release tag (e.g. 0.2.0),
+          # or 7-char SHA when commit-pinned. Detected via the dot test.
+          if [[ "$RATELIMIT" == *.* ]]; then
+            RATELIMIT_TAG="$RATELIMIT"
+          else
+            RATELIMIT_TAG="${RATELIMIT:0:7}"
+          fi
+
+          TAGS="${IMAGE}:${CADDY}-${CORAZA}-${CRS_PATCH}-${RATELIMIT_TAG}"
           TAGS="${TAGS},${IMAGE}:${CADDY_MAJOR}-${CORAZA_MAJOR}-${CRS_MINOR}"
           TAGS="${TAGS},${IMAGE}:${CADDY_MAJOR}-${CORAZA_MAJOR}-${CRS_MAJOR}"
           TAGS="${TAGS},${IMAGE}:latest"
@@ -75,6 +86,7 @@ jobs:
           echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
           echo "caddy=${CADDY}" >> "$GITHUB_OUTPUT"
           echo "coraza=${CORAZA}" >> "$GITHUB_OUTPUT"
+          echo "ratelimit=${RATELIMIT}" >> "$GITHUB_OUTPUT"
           echo "crs_patch=${CRS_PATCH}" >> "$GITHUB_OUTPUT"
 
       # Build for testing (single platform, load into local docker)
@@ -89,6 +101,7 @@ jobs:
             XCADDY_VERSION=${{ needs.prepare.outputs.xcaddy }}
             CADDY_VERSION=${{ steps.meta.outputs.caddy }}
             CORAZA_CADDY_VERSION=${{ steps.meta.outputs.coraza }}
+            CADDY_RATELIMIT_VERSION=${{ steps.meta.outputs.ratelimit }}
             CRS_VERSION=${{ steps.meta.outputs.crs_patch }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -129,6 +142,23 @@ jobs:
           fi
           echo "OK: XSS blocked with 403"
 
+          # Rate limit test - zone allows 2 events per minute on /limited*
+          echo "=== Rate Limit Test ==="
+          S1=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/limited)
+          S2=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/limited)
+          S3=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/limited)
+          if [ "$S1" != "200" ] || [ "$S2" != "200" ]; then
+            echo "FAIL: First two requests expected 200, got $S1 $S2"
+            docker logs caddy-test
+            exit 1
+          fi
+          if [ "$S3" != "429" ]; then
+            echo "FAIL: Third request expected 429, got $S3"
+            docker logs caddy-test
+            exit 1
+          fi
+          echo "OK: Rate limit enforced (200, 200, 429)"
+
           docker stop caddy-test
 
       # Build and push multi-platform
@@ -144,6 +174,7 @@ jobs:
             XCADDY_VERSION=${{ needs.prepare.outputs.xcaddy }}
             CADDY_VERSION=${{ steps.meta.outputs.caddy }}
             CORAZA_CADDY_VERSION=${{ steps.meta.outputs.coraza }}
+            CADDY_RATELIMIT_VERSION=${{ steps.meta.outputs.ratelimit }}
             CRS_VERSION=${{ steps.meta.outputs.crs_patch }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

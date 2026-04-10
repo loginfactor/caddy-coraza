@@ -7,6 +7,7 @@ ARG TARGETARCH
 ARG TARGETOS
 ARG CADDY_VERSION
 ARG CORAZA_CADDY_VERSION
+ARG CADDY_RATELIMIT_VERSION
 ARG CRS_VERSION
 ARG XCADDY_VERSION
 
@@ -17,7 +18,8 @@ ENV GOOS=${TARGETOS} \
     GOARCH=${TARGETARCH}
 
 RUN xcaddy build v${CADDY_VERSION} \
-    --with github.com/corazawaf/coraza-caddy/v2@v${CORAZA_CADDY_VERSION}
+    --with github.com/corazawaf/coraza-caddy/v2@v${CORAZA_CADDY_VERSION} \
+    --with github.com/mholt/caddy-ratelimit@${CADDY_RATELIMIT_VERSION}
 
 # Download and extract OWASP CRS
 ADD https://github.com/coreruleset/coreruleset/archive/refs/tags/v${CRS_VERSION}.tar.gz /tmp/crs.tar.gz
