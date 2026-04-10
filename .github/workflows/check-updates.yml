@@ -12,10 +12,13 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    outputs:
+      has_updates: ${{ steps.check.outputs.has_updates }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -43,3 +46,14 @@ jobs:
 
           Automatically detected new versions via check-versions.sh"
           git push
+
+  # Pushes by GITHUB_TOKEN do not trigger other workflows, so chain build.yml
+  # explicitly via workflow_call when the check job committed an update.
+  build:
+    needs: check
+    if: needs.check.outputs.has_updates == 'true'
+    uses: ./.github/workflows/build.yml
+    permissions:
+      contents: read
+      packages: write
+    secrets: inherit
