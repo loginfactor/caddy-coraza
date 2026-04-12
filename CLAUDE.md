@@ -41,18 +41,20 @@ The image is hardened at build time:
 - Non-root user `caddy` (1000:1000), no login shell
 - Caddy binary read-only (555)
 - No Caddyfile or coraza.conf in image (user must mount their own)
+- No `EXPOSE` -- ports depend on the user's Caddyfile
+- No capabilities -- listen on ports >= 1024, use Docker port mapping for 80/443
 - Built-in `HEALTHCHECK`
 
 For full hardening, apply these runtime flags:
 
 ```bash
-docker run --read-only --cap-drop ALL --cap-add NET_BIND_SERVICE \
+docker run --read-only --cap-drop ALL \
   --security-opt no-new-privileges:true \
   --tmpfs /tmp/caddy caddy-coraza:test
 ```
 
 - `--read-only`: prevents writes to the container filesystem
-- `--cap-drop ALL --cap-add NET_BIND_SERVICE`: drops all capabilities except binding to ports < 1024
+- `--cap-drop ALL`: drops all capabilities (no privileged ports needed)
 - `--security-opt no-new-privileges:true`: prevents privilege escalation via setuid/setgid binaries
 - `--tmpfs /tmp/caddy`: writable tmpfs for runtime temp files
 
@@ -106,7 +108,7 @@ docker build \
 
 ```bash
 # Start container with test Caddyfile
-docker run --rm -d --name caddy-test -p 8080:80 \
+docker run --rm -d --name caddy-test -p 8080:8080 \
   -v $(pwd)/test/Caddyfile:/etc/caddy/Caddyfile:ro caddy-coraza:test
 
 # Health check (expect 200)

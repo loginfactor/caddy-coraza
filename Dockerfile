@@ -32,7 +32,7 @@ RUN tar -xzf /tmp/crs.tar.gz -C /tmp && \
 FROM registry.access.redhat.com/ubi9/ubi-minimal
 
 RUN microdnf update -y && \
-    microdnf install -y ca-certificates libcap mailcap && \
+    microdnf install -y ca-certificates mailcap && \
     microdnf clean all
 
 RUN groupadd --gid 1000 caddy && \
@@ -42,15 +42,12 @@ COPY --from=builder --chmod=555 /go/caddy /usr/bin/caddy
 COPY --from=builder /tmp/crs /etc/caddy/crs
 
 RUN mkdir -p /config/caddy /data/caddy /etc/caddy /tmp/caddy && \
-    chown -R caddy:caddy /config /data /tmp/caddy && \
-    setcap cap_net_bind_service=+ep /usr/bin/caddy
+    chown -R caddy:caddy /config /data /tmp/caddy
 
 ENV XDG_CONFIG_HOME=/config
 ENV XDG_DATA_HOME=/data
 ENV TMPDIR=/tmp/caddy
 ENV CADDY_ADMIN=off
-
-EXPOSE 80 443 443/udp
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD ["caddy", "version"]

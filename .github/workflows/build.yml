@@ -110,7 +110,7 @@ jobs:
         run: |
           # Start container with test Caddyfile
           docker run --rm -d --name caddy-test \
-            -p 8080:80 \
+            -p 8080:8080 \
             -v "${{ github.workspace }}/test/Caddyfile:/etc/caddy/Caddyfile:ro" \
             caddy-coraza:test
 
