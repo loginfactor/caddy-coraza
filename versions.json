@@ -1,5 +1,5 @@
 {
-  "caddy": "2.11.2",
+  "caddy": "2.11.3",
   "coraza_caddy": "2.5.0",
   "caddy_ratelimit": "b8d8c9a9d99e",
   "crs_versions": {
