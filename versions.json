@@ -3,7 +3,7 @@
   "coraza_caddy": "2.5.0",
   "caddy_ratelimit": "b8d8c9a9d99e",
   "crs_versions": {
-    "4.25": "4.25.0"
+    "4.25": "4.25.1"
   },
   "xcaddy": "0.4.5",
   "go": "1.25"
